@@ -14,6 +14,17 @@ export interface LocationData {
   address?: string;
 }
 
+export interface UserProfile {
+  id: string;
+  name: string;
+  phone?: string;
+  email?: string;
+  bloodGroup?: string;
+  emergencyNotes?: string;
+  authMethod: 'phone' | 'google' | 'guest';
+  createdAt: number;
+}
+
 export interface AlertLog {
   id: string;
   timestamp: string;

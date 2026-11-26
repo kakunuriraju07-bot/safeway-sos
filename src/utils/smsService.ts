@@ -1,4 +1,4 @@
-import { TrustedContact, LocationData } from '../types';
+import { TrustedContact, LocationData, UserProfile } from '../types';
 
 export const generateDirectionsLink = (lat: number, lng: number): string => {
   // Google Maps native navigation scheme (daddr = destination address).
@@ -10,17 +10,27 @@ export const generateMapsLink = (lat: number, lng: number): string => {
   return generateDirectionsLink(lat, lng);
 };
 
-export const formatSOSMessage = (location: LocationData, customNote?: string): string => {
+export const formatSOSMessage = (
+  location: LocationData,
+  user?: UserProfile | null,
+  customNote?: string
+): string => {
   const navLink = generateDirectionsLink(location.latitude, location.longitude);
   const time = new Date(location.timestamp).toLocaleTimeString();
   const notePart = customNote ? `\nNote: ${customNote}` : '';
-  return `🚨 EMERGENCY SOS ALERT! 🚨\nI need urgent help! Tap this link for direct directions to my live location:\n👉 ${navLink}\n\n(GPS Accuracy: ~${Math.round(location.accuracy)}m recorded at ${time})${notePart}\nPlease navigate to me immediately!`;
+  const fromPart = user?.name
+    ? `\nFROM: ${user.name.toUpperCase()}${user.phone ? ` (${user.phone})` : ''}`
+    : '';
+  const bloodPart = user?.bloodGroup ? `\nBlood Group: ${user.bloodGroup}` : '';
+
+  return `🚨 EMERGENCY SOS ALERT! 🚨${fromPart}${bloodPart}\nI need urgent help! Tap this link to navigate directly to my live location:\n👉 ${navLink}\n\n(GPS Accuracy: ~${Math.round(location.accuracy)}m at ${time})${notePart}\nPlease hurry or send emergency services!`;
 };
 
 // Dispatch via Backend API (Twilio / Gateway)
 export const sendBackendSOSAlert = async (
   contacts: TrustedContact[],
   location: LocationData,
+  user?: UserProfile | null,
   customNote?: string
 ): Promise<{ success: boolean; message: string; results?: any[] }> => {
   try {
@@ -32,6 +42,9 @@ export const sendBackendSOSAlert = async (
         latitude: location.latitude,
         longitude: location.longitude,
         accuracy: location.accuracy,
+        senderName: user?.name,
+        senderPhone: user?.phone,
+        bloodGroup: user?.bloodGroup,
         customNote,
       }),
     });
@@ -50,10 +63,11 @@ export const sendBackendSOSAlert = async (
 export const openDeviceSMS = (
   contacts: TrustedContact[],
   location: LocationData,
+  user?: UserProfile | null,
   customNote?: string
 ) => {
   const phoneNumbers = contacts.map(c => c.phone.trim()).join(';'); // Android and iOS delimiter
-  const message = encodeURIComponent(formatSOSMessage(location, customNote));
+  const message = encodeURIComponent(formatSOSMessage(location, user, customNote));
   
   // iOS uses &body=, Android/desktop uses ?body=
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
@@ -67,9 +81,10 @@ export const openDeviceSMS = (
 export const openWhatsAppSOS = (
   contact: TrustedContact,
   location: LocationData,
+  user?: UserProfile | null,
   customNote?: string
 ) => {
   const cleanPhone = contact.phone.replace(/[^0-9]/g, '');
-  const message = encodeURIComponent(formatSOSMessage(location, customNote));
+  const message = encodeURIComponent(formatSOSMessage(location, user, customNote));
   window.open(`https://wa.me/${cleanPhone}?text=${message}`, '_blank');
 };
